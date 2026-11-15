@@ -174,7 +174,6 @@ internal sealed unsafe class KosGpu : IDisposable
     private ID3D11RenderTargetView* shapeRtv, outRtv;
     private ID3D11ShaderResourceView* shapeSrv, outSrv;
 
-    private nint depthSource;
     private ID3D11ShaderResourceView* depthSrv;
     private nint maskSource;
     private ID3D11Texture2D* maskCopy;
@@ -280,6 +279,10 @@ internal sealed unsafe class KosGpu : IDisposable
             LastFault = $"{stage} switched off: {e.Message}";
             Discard();
             return 0;
+        }
+        finally
+        {
+            Release(ref depthSrv); // the executed command list keeps what it needs; nothing of the game's is held past the frame
         }
     }
 
@@ -401,12 +404,13 @@ internal sealed unsafe class KosGpu : IDisposable
         shaderView = srv;
     }
 
-    /// <summary>A typed view of the game's typeless depth texture, kept until the game swaps the texture.</summary>
+    /// <summary>
+    /// A typed view of the game's typeless depth texture, made afresh each frame and released when the frame ends:
+    /// a view holds its texture alive, and the game replaces that texture whenever the resolution changes.
+    /// </summary>
     private ID3D11ShaderResourceView* DepthView(nint texture)
     {
-        if (texture == depthSource && depthSrv != null) return depthSrv;
         Release(ref depthSrv);
-        depthSource = 0;
         D3D11_TEXTURE2D_DESC desc;
         ((ID3D11Texture2D*)texture)->GetDesc(&desc);
         if (desc.SampleDesc.Count != 1) throw new NotSupportedException("multisampled depth");
@@ -423,7 +427,6 @@ internal sealed unsafe class KosGpu : IDisposable
         ID3D11ShaderResourceView* srv;
         Check(device->CreateShaderResourceView((ID3D11Resource*)texture, &view, &srv), "CreateShaderResourceView(depth)"); // holds its own reference
         depthSrv = srv;
-        depthSource = texture;
         return srv;
     }
 
@@ -433,7 +436,14 @@ internal sealed unsafe class KosGpu : IDisposable
         D3D11_TEXTURE2D_DESC desc;
         ((ID3D11Texture2D*)backBuffer)->GetDesc(&desc);
         if (desc.Width != width || desc.Height != height) return null;
-        if (backBuffer != maskSource || maskSrv == null)
+        var stale = backBuffer != maskSource || maskSrv == null;
+        if (!stale) // the same address can come back as a new buffer after a resize; CopyResource drops a mismatched copy silently
+        {
+            D3D11_TEXTURE2D_DESC have;
+            maskCopy->GetDesc(&have);
+            stale = have.Width != desc.Width || have.Height != desc.Height || have.Format != desc.Format;
+        }
+        if (stale)
         {
             Release(ref maskSrv);
             Release(ref maskCopy);
@@ -583,7 +593,7 @@ internal sealed unsafe class KosGpu : IDisposable
         Release(ref vsFill);
         Release(ref deferred);
         Release(ref device);
-        (depthSource, maskSource, fillCapacity, strokeCapacity) = (0, 0, 0, 0);
+        (maskSource, fillCapacity, strokeCapacity) = (0, 0, 0);
     }
 
     private static void Release<T>(ref T* p) where T : unmanaged

@@ -209,6 +209,33 @@ public sealed unsafe class GpuTests : IDisposable
         Assert.Equal(32, Read(gpu.Render(Wall(5), Frame(withDepth: false, size: 32))).Width);
     }
 
+    // The game owns its depth texture and replaces it on a resolution change; a view kept between frames would keep
+    // the old texture alive behind the game's back. A view holds its texture without showing in the texture's COM
+    // count, so this watches for the texture's destruction instead: it releases a probe attached as private data.
+    [Theory]
+    [InlineData(false)] // control: proves the probe sees the texture die
+    [InlineData(true)]
+    public void TheGameDepthTextureIsNotHeldBetweenFrames(bool render)
+    {
+        static uint Refs(ID3D11Texture2D* t)
+        {
+            t->AddRef();
+            return t->Release();
+        }
+        var game = DepthBuffer(Size, Size, ShapeTests.Camera().M43 / SceneAt);
+        var probe = DepthBuffer(1, 1, 0);
+        var key = Guid.NewGuid();
+        Check(game->SetPrivateDataInterface(&key, (IUnknown*)probe));
+        var held = Refs(probe);
+        if (render)
+            Read(gpu.Render(Wall(5), new KosGpuFrame(ShapeTests.Camera(), new Vector2(Size), (nint)game, Vector2.One, 0, 0, 0.05f)));
+        immediate->Flush();
+        game->Release(); // the game lets go of it
+        var after = Refs(probe);
+        probe->Release();
+        Assert.Equal(held - 1, after);
+    }
+
     [Fact]
     public void DisposeReleasesEveryReference()
     {
