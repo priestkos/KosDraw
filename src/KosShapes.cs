@@ -132,6 +132,30 @@ internal sealed class KosShapes
         for (var k = 1; k < corners.Count - 1; k++) Fills.Add(new KosFill(corners[0], corners[k], corners[k + 1], c));
     }
 
+    /// <summary>
+    /// A see-through column of light standing on <paramref name="foot"/>: a 24-sided tube cut into
+    /// <paramref name="bands"/> bands whose alpha falls from <paramref name="color"/>'s to nothing at the top.
+    /// </summary>
+    public void Pillar(Vector3 foot, float radius, float height, Vector4 color, int bands = 8)
+    {
+        const int sides = 24;
+        if (radius <= 0 || height <= 0 || bands < 1) return;
+        for (var b = 0; b < bands; b++)
+        {
+            var c = Pack(color with { W = color.W * (1 - (float)b / bands) });
+            float y0 = height * b / bands, y1 = height * (b + 1) / bands;
+            for (var k = 0; k < sides; k++)
+            {
+                float a0 = MathF.Tau * k / sides, a1 = MathF.Tau * (k + 1) / sides;
+                Vector3 r0 = new(MathF.Sin(a0) * radius, 0, MathF.Cos(a0) * radius), r1 = new(MathF.Sin(a1) * radius, 0, MathF.Cos(a1) * radius);
+                Vector3 lo0 = foot + r0 + new Vector3(0, y0, 0), lo1 = foot + r1 + new Vector3(0, y0, 0);
+                Vector3 hi0 = foot + r0 + new Vector3(0, y1, 0), hi1 = foot + r1 + new Vector3(0, y1, 0);
+                Fills.Add(new KosFill(lo0, lo1, hi1, c));
+                Fills.Add(new KosFill(lo0, hi1, hi0, c));
+            }
+        }
+    }
+
     /// <summary>A screen-space dot <paramref name="radius"/> pixels across, at a world point.</summary>
     public void Dot(Vector3 at, float radius, Vector4 color)
     {

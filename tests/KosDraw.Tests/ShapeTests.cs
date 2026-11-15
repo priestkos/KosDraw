@@ -100,6 +100,28 @@ public class ShapeTests
     }
 
     [Fact]
+    public void PillarStandsOnItsFootAndFadesUpwards()
+    {
+        var s = new KosShapes();
+        var foot = new Vector3(3, 1, -2);
+        s.Pillar(foot, 0.5f, 6, Red with { W = 0.8f }, bands: 4);
+        Assert.Equal(24 * 4 * 2, s.Fills.Count);
+        var corners = s.Fills.SelectMany(f => new[] { f.A, f.B, f.C }).ToList();
+        Assert.All(corners, p => Assert.Equal(0.5f, new Vector2(p.X - foot.X, p.Z - foot.Z).Length(), 4));
+        Assert.Equal(foot.Y, corners.Min(p => p.Y), 4);
+        Assert.Equal(foot.Y + 6, corners.Max(p => p.Y), 4);
+        var alpha = s.Fills.Select(f => (f.A.Y, A: f.Color >> 24)).OrderBy(f => f.Y).Select(f => f.A).ToList();
+        Assert.True(alpha.Zip(alpha.Skip(1)).All(x => x.First >= x.Second)); // never brighter higher up
+        Assert.Equal(KosShapes.Pack(Red with { W = 0.8f }) >> 24, alpha[0]);
+        Assert.InRange(alpha[^1], 1u, alpha[0] - 1); // the top band is fainter but still there
+
+        s.Clear();
+        s.Pillar(foot, 0, 6, Red);
+        s.Pillar(foot, 0.5f, 0, Red);
+        Assert.Empty(s.Fills);
+    }
+
+    [Fact]
     public void PacksLikeImGui()
     {
         Assert.Equal(0xFF0000FFu, KosShapes.Pack(new Vector4(1, 0, 0, 1)));
