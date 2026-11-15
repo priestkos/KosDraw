@@ -1,0 +1,25 @@
+<Project Sdk="Dalamud.NET.Sdk/15.0.0">
+  <!-- Dev-only host for the in-game check. Never released: load it as a dev plugin from bin/Release/KosDrawDemo.dll. -->
+  <PropertyGroup>
+    <Version>0.1.0</Version>
+    <Description>Development host for KosDraw: draws every KosDraw shape round your character, with switches for the GPU path, depth occlusion, the game-UI mask and fault injection. Not for release.</Description>
+    <OutputPath>bin\$(Configuration)\</OutputPath>
+    <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
+    <LangVersion>latest</LangVersion>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="../../src/**/*.cs" />
+    <!-- Dalamud ships TerraFX but the SDK does not reference it; Private=false keeps Dalamud's copy the one loaded. -->
+    <Reference Include="TerraFX.Interop.Windows" Private="false" />
+  </ItemGroup>
+  <PropertyGroup>
+    <Author>PriestKos</Author>
+    <Authors>PriestKos</Authors>
+    <Name>KosDrawDemo</Name>
+    <Punchline>Development host for the KosDraw world-overlay library.</Punchline>
+    <RepoUrl>https://github.com/priestkos/KosDraw</RepoUrl>
+    <Tags>dev;overlay</Tags>
+  </PropertyGroup>
+</Project>

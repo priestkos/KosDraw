@@ -1,0 +1,42 @@
+name: Tests
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  tests:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v7
+      - name: Set up .NET
+        uses: actions/setup-dotnet@v6
+        with:
+          dotnet-version: 10.0.x
+
+      - name: Run the unit tests (geometry, and the GPU path on WARP)
+        run: dotnet test tests/KosDraw.Tests/KosDraw.Tests.csproj -c Release
+
+  demo:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v7
+      - name: Set up .NET
+        uses: actions/setup-dotnet@v6
+        with:
+          dotnet-version: 10.0.x
+
+      - name: Install the Dalamud development distribution
+        shell: pwsh
+        run: |
+          $dest = Join-Path $env:APPDATA 'XIVLauncher\addon\Hooks\dev'
+          New-Item -ItemType Directory -Force -Path $dest | Out-Null
+          Invoke-WebRequest -UseBasicParsing -Uri 'https://goatcorp.github.io/dalamud-distrib/latest.zip' -OutFile dalamud.zip
+          Expand-Archive -Path dalamud.zip -DestinationPath $dest -Force
+
+      - name: Build the demo plugin (compiles every source file against Dalamud)
+        run: dotnet build demo/KosDrawDemo/KosDrawDemo.csproj -c Release

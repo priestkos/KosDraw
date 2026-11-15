@@ -1,0 +1,24 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+  <ItemGroup>
+    <!-- The pure and GPU layers only: the Dalamud glue (KosOverlay.cs) needs the game. -->
+    <Compile Include="..\..\src\KosShapes.cs" Link="KosShapes.cs" />
+    <Compile Include="..\..\src\KosGpu.cs" Link="KosGpu.cs" />
+  </ItemGroup>
+  <ItemGroup>
+    <!-- The version Dalamud ships (TerraFX.Interop.Windows.dll 10.0.26100.5 in the dev distrib, 2026-11-15). -->
+    <PackageReference Include="TerraFX.Interop.Windows" Version="10.0.26100.5" />
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.11.1" />
+    <PackageReference Include="xunit" Version="2.9.2" />
+    <PackageReference Include="xunit.runner.visualstudio" Version="2.8.2">
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+      <PrivateAssets>all</PrivateAssets>
+    </PackageReference>
+  </ItemGroup>
+</Project>
