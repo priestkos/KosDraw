@@ -55,7 +55,7 @@ internal sealed class DemoWindow(KosOverlay overlay) : Window("KosDraw demo")
     private static readonly Vector4 Teal = new(0.2f, 0.85f, 0.8f, 0.45f), Gold = new(1f, 0.8f, 0.3f, 0.9f), Crimson = new(0.9f, 0.2f, 0.3f, 0.4f);
 
     public bool Show = true;
-    private bool circle = true, ring = true, cone = true, fan, arc = true, lines = true, polygon, marks = true, outlines;
+    private bool circle = true, ring = true, cone = true, fan, arc = true, lines = true, polygon, marks = true, outlines, motion;
     private float thickness = 3;
 
     public void Shapes(KosShapes s, Vector3 me, float facing, Vector3? target, float? targetFacing)
@@ -78,6 +78,14 @@ internal sealed class DemoWindow(KosOverlay overlay) : Window("KosDraw demo")
             s.Text(me + new Vector3(0, 2.6f, 0), "KosDraw", Gold);
         }
         if (target is { } at && targetFacing is { } tf) s.Cone(at, 6, tf, MathF.PI / 4, Crimson, t);
+        if (motion)
+        {
+            var sec = Environment.TickCount64 % 60_000 / 1000f; // wraps every minute, so float keeps its precision
+            var away = me + new Vector3(MathF.Sin(facing), 0, MathF.Cos(facing)) * 8;
+            s.Gleam(me, 2, sec / 3, Gold);
+            s.Ripple(away, 3, sec % 2 / 1.5f, Teal with { W = 0.9f });
+            s.Pulse(me, away, sec % 2 / 1.2f, Gold, lift: 2);
+        }
     }
 
     public override void Draw()
@@ -95,6 +103,7 @@ internal sealed class DemoWindow(KosOverlay overlay) : Window("KosDraw demo")
         ImGui.Checkbox("Line + arrow", ref lines);
         ImGui.SameLine();
         ImGui.Checkbox("Polygon", ref polygon);
+        ImGui.Checkbox("Motion (gleam, ripple, pulse)", ref motion);
         ImGui.SameLine();
         ImGui.Checkbox("Dot + text", ref marks);
         ImGui.Checkbox("Outlines instead of fills", ref outlines);

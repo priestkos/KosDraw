@@ -1,7 +1,7 @@
 # KosDraw
 
 A small world-overlay library for the PriestKos Dalamud plugins: circles, rings, cones, fans, arcs, lines, arrows,
-polygons, pillars of light, dots and labels drawn **in the game world**, on the ground round the player, a target or any map point.
+polygons, pillars of light, ripples, gleams, pulses, dots and labels drawn **in the game world**, on the ground round the player, a target or any map point.
 
 `source-included` · Dalamud API 15 · .NET 10 · AGPL-3.0
 
@@ -15,6 +15,9 @@ polygons, pillars of light, dots and labels drawn **in the game world**, on the 
 - **Shapes** (`KosShapes`): `Circle`, `Ring`, `Cone`, `Fan` (ring sector), `Arc`, `Line`, `Arrow`, `Polygon`, `Pillar`,
   `Dot`, `Text`. `thickness` 0 fills a shape; above 0 outlines it that many pixels wide. Round shapes are cut into 5° steps.
   `Pillar` is a see-through upright tube (24 sides) that fades out towards its top: a beacon over a spot.
+- **Motion** (`KosShapes`): `Ripple` (rings spreading out and fading), `Gleam` (a bright arc with a fading tail
+  chasing round a circle) and `Pulse` (a light running along an arch from one point to another). Each takes a progress
+  `t` and is a pure function of it: the caller owns the clock, so a calm mode is just not calling them.
 - **Two ways to draw**, chosen per overlay:
   - **ImGui path** (default): shapes are projected and drawn on ImGui's background draw list. No GPU code. Shapes show
     through walls and terrain.
@@ -99,7 +102,7 @@ dotnet test tests/KosDraw.Tests/KosDraw.Tests.csproj -c Release
 22 xUnit checks, run without the game:
 
 - **Geometry** (`src/KosShapes.cs`): arc spacing and angle convention, filled circle and ring areas, closed outlines,
-  cone span, arrow head, polygon fan, pillar shape and fade, colour packing, projection against a reverse-Z camera, and near-plane clipping
+  cone span, arrow head, polygon fan, pillar shape and fade, ripple/gleam/pulse at given progress, colour packing, projection against a reverse-Z camera, and near-plane clipping
   of segments, triangles and polylines (including a cut loop re-joined through its first corner).
 - **GPU path** (`src/KosGpu.cs`) on WARP, Windows' software Direct3D 11, with a fake depth buffer and back buffer:
   every shader compiles; a fill in front of the scene comes out in straight alpha; behind it, it is hidden or faded,

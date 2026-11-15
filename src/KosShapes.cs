@@ -156,6 +156,62 @@ internal sealed class KosShapes
         }
     }
 
+    // Motion: each takes progress t and is a pure function of it, so the caller owns the clock and the tests can step it.
+
+    /// <summary>
+    /// <paramref name="waves"/> flat rings spreading from <paramref name="centre"/> out to <paramref name="radius"/>,
+    /// each fading as it grows, at progress <paramref name="t"/> (0 to 1, staggered so the last ends at 1). Nothing outside that.
+    /// </summary>
+    public void Ripple(Vector3 centre, float radius, float t, Vector4 color, int waves = 3)
+    {
+        const float gap = 0.25f; // a wave starts this much of its own run after the one before
+        if (radius <= 0 || waves < 1 || t < 0 || t >= 1) return;
+        for (var w = 0; w < waves; w++)
+        {
+            var p = t * (1 + gap * (waves - 1)) - gap * w;
+            if (p <= 0 || p >= 1) continue;
+            var r = radius * p;
+            Ring(centre, r - radius * 0.06f, r, color with { W = color.W * (1 - p) });
+        }
+    }
+
+    /// <summary>
+    /// A bright arc chasing round a circle, its head at angle <paramref name="t"/>·τ (any t: whole turns wrap) and its
+    /// tail <paramref name="length"/> radians behind, fading out in six steps.
+    /// </summary>
+    public void Gleam(Vector3 centre, float radius, float t, Vector4 color, float length = MathF.PI / 2, float thickness = 3)
+    {
+        const int steps = 6;
+        if (radius <= 0 || length <= 0 || thickness <= 0) return;
+        var head = (t - MathF.Floor(t)) * MathF.Tau;
+        for (var k = 0; k < steps; k++)
+            Arc(centre, radius, head - length * (k + 1) / steps, head - length * k / steps, color with { W = color.W * (1 - (float)k / steps) }, thickness);
+    }
+
+    /// <summary>
+    /// A faint arch from <paramref name="a"/> to <paramref name="b"/>, <paramref name="lift"/> metres high at its middle, with
+    /// a bright pulse running along it: the pulse's front is at progress <paramref name="t"/> (0 to 1). Nothing outside that.
+    /// </summary>
+    public void Pulse(Vector3 a, Vector3 b, float t, Vector4 color, float lift = 1, float thickness = 3)
+    {
+        const int n = 24, tailSteps = 4;
+        const float tail = 0.2f; // of the arch's run
+        if (thickness <= 0 || t < 0 || t > 1 || Vector3.DistanceSquared(a, b) < 1e-8f) return;
+        var arch = new Vector3[n + 1];
+        for (var k = 0; k <= n; k++) arch[k] = PulsePoint(a, b, lift, (float)k / n);
+        Strokes.Add(new KosStroke(arch, false, Pack(color with { W = color.W * 0.3f }), thickness * 0.5f));
+        for (var k = 0; k < tailSteps; k++)
+        {
+            float s1 = t - tail * k / tailSteps, s0 = MathF.Max(0, t - tail * (k + 1) / tailSteps);
+            if (s1 <= 0) break;
+            Strokes.Add(new KosStroke([PulsePoint(a, b, lift, s0), PulsePoint(a, b, lift, (s0 + s1) / 2), PulsePoint(a, b, lift, s1)],
+                false, Pack(color with { W = color.W * (1 - (float)k / tailSteps) }), thickness));
+        }
+    }
+
+    /// <summary>The point at <paramref name="s"/> (0 to 1) along <see cref="Pulse"/>'s arch: a parabola over the straight line.</summary>
+    public static Vector3 PulsePoint(Vector3 a, Vector3 b, float lift, float s) => Vector3.Lerp(a, b, s) + new Vector3(0, lift * 4 * s * (1 - s), 0);
+
     /// <summary>A screen-space dot <paramref name="radius"/> pixels across, at a world point.</summary>
     public void Dot(Vector3 at, float radius, Vector4 color)
     {

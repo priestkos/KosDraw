@@ -100,6 +100,78 @@ public class ShapeTests
     }
 
     [Fact]
+    public void RippleSpreadsFadesAndStops()
+    {
+        var s = new KosShapes();
+        var c = new Vector3(1, 0, 1);
+        s.Ripple(c, 2, 0.01f, Red, waves: 3);
+        var early = s.Fills.Count;
+        s.Clear();
+        s.Ripple(c, 2, 0.5f, Red, waves: 3);
+        Assert.True(s.Fills.Count > early); // later waves have started
+        var corners = s.Fills.SelectMany(f => new[] { f.A, f.B, f.C }).ToList();
+        Assert.All(corners, p => Assert.InRange(Vector3.Distance(p, c), 0f, 2.0001f));
+        // further out = fainter
+        var byRadius = s.Fills.Select(f => (R: Vector3.Distance(f.B, c), A: f.Color >> 24)).OrderBy(x => x.R).ToList();
+        Assert.True(byRadius.First().A > byRadius.Last().A);
+
+        foreach (var t in new[] { -0.1f, 1f, 1.5f })
+        {
+            s.Clear();
+            s.Ripple(c, 2, t, Red);
+            Assert.Empty(s.Fills);
+        }
+    }
+
+    [Fact]
+    public void GleamHeadSitsAtItsAngleAndTheTailFades()
+    {
+        var s = new KosShapes();
+        var c = Vector3.Zero;
+        s.Gleam(c, 1, 0.25f, Red); // a quarter turn: facing +X
+        Assert.Equal(6, s.Strokes.Count);
+        var head = s.Strokes[0].Points[^1];
+        Assert.Equal(1, head.X, 4);
+        Assert.Equal(0, head.Z, 4);
+        var alpha = s.Strokes.Select(k => k.Color >> 24).ToList();
+        Assert.True(alpha.Zip(alpha.Skip(1)).All(x => x.First > x.Second));
+
+        var again = new KosShapes();
+        again.Gleam(c, 1, 1.25f, Red); // whole turns wrap
+        Assert.Equal(head.X, again.Strokes[0].Points[^1].X, 4);
+        again.Clear();
+        again.Gleam(c, 1, -0.75f, Red);
+        Assert.Equal(head.X, again.Strokes[0].Points[^1].X, 4);
+    }
+
+    [Fact]
+    public void PulseRunsAlongAnArchFromAToB()
+    {
+        var s = new KosShapes();
+        Vector3 a = new(0, 0, 0), b = new(4, 0, 0);
+        s.Pulse(a, b, 0.5f, Red, lift: 1);
+        var arch = s.Strokes[0].Points;
+        Assert.Equal(a, arch[0]);
+        Assert.Equal(b, arch[^1]);
+        Assert.Equal(1, arch.Max(p => p.Y), 4); // highest at the middle
+        Assert.Equal(KosShapes.PulsePoint(a, b, 1, 0.5f), s.Strokes[1].Points[^1]); // the front is at t
+        var tail = s.Strokes.Skip(1).Select(k => k.Color >> 24).ToList();
+        Assert.True(tail.Zip(tail.Skip(1)).All(x => x.First > x.Second));
+
+        s.Clear();
+        s.Pulse(a, b, 0.05f, Red); // the tail is cut at a, never before it
+        Assert.All(s.Strokes.Skip(1).SelectMany(k => k.Points), p => Assert.InRange(p.X, 0f, 4f));
+        foreach (var t in new[] { -0.1f, 1.1f })
+        {
+            s.Clear();
+            s.Pulse(a, b, t, Red);
+            Assert.True(s.IsEmpty);
+        }
+        s.Pulse(a, a, 0.5f, Red);
+        Assert.True(s.IsEmpty);
+    }
+
+    [Fact]
     public void PillarStandsOnItsFootAndFadesUpwards()
     {
         var s = new KosShapes();
