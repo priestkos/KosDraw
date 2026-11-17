@@ -13,11 +13,19 @@ polygons, pillars of light, ripples, gleams, pulses, dots and labels drawn **in 
   every ImGui window. Shapes are in world coordinates; angles follow the game's object rotation (0 faces south/+Z,
   π/2 faces east/+X), so `player.Rotation` can be passed straight in.
 - **Shapes** (`KosShapes`): `Circle`, `Ring`, `Cone`, `Fan` (ring sector), `Arc`, `Line`, `Arrow`, `Polygon`, `Pillar`,
-  `Dot`, `Text`. `thickness` 0 fills a shape; above 0 outlines it that many pixels wide. Round shapes are cut into 5° steps.
-  `Pillar` is a see-through upright tube (24 sides) that fades out towards its top: a beacon over a spot.
-- **Motion** (`KosShapes`): `Ripple` (rings spreading out and fading), `Gleam` (a bright arc with a fading tail
-  chasing round a circle) and `Pulse` (a light running along an arch from one point to another). Each takes a progress
-  `t` and is a pure function of it: the caller owns the clock, so a calm mode is just not calling them.
+  `Dot`, `Text`. On `Circle`, `Ring`, `Cone`, `Fan` and `Polygon`, `thickness` 0 (the default) fills the shape and above
+  0 outlines it that many pixels wide; `Line`, `Arc` and `Arrow` default to 2 px and draw nothing at 0. Round shapes are
+  cut into 5° steps. `Pillar(foot, radius, height, color, bands = 8)` is a see-through upright tube (24 sides) whose
+  alpha falls band by band to nothing at its top: a beacon over a spot. `Dot` radius is in screen pixels.
+- **Motion** (`KosShapes`): each takes a progress `t` and is a pure function of it: the caller owns the clock, so a
+  calm mode is just not calling them.
+  - `Ripple(centre, radius, t, color, waves = 3)`: flat rings spreading out to `radius`, each fading as it grows,
+    staggered so the last ends at `t` = 1; nothing outside 0 ≤ `t` < 1.
+  - `Gleam(centre, radius, t, color, length = π/2, thickness = 3)`: a bright arc chasing round a circle, its head at
+    `t`·τ (whole turns wrap, so any `t` works) and a tail `length` radians long fading out in six steps.
+  - `Pulse(a, b, t, color, lift = 1, thickness = 3)`: a faint arch from `a` to `b`, `lift` metres high at its middle,
+    with a bright pulse whose front is at `t` (0 to 1; nothing outside that). `KosShapes.PulsePoint` gives a point on
+    the arch.
 - **Two ways to draw**, chosen per overlay:
   - **ImGui path** (default): shapes are projected and drawn on ImGui's background draw list. No GPU code. Shapes show
     through walls and terrain.
@@ -48,8 +56,10 @@ matrix's `M43`.
 - **GPU path**: the device comes from Dalamud (`IUiBuilder.DeviceHandle`), and objects are created lazily on the first
   GPU frame. Shapes are recorded on a private **deferred context**: fills as triangles, lines as quads widened in
   screen space in the vertex shader. Each pixel turns both its own depth and the scene's (a typed view of the game's
-  typeless depth texture, scaled for dynamic resolution) back into metres and compares them with a tolerance. A
-  composite pass masks out game UI (where the back buffer's alpha marks it) and turns premultiplied alpha into the
+  typeless depth texture, made afresh each frame and released when it ends so nothing of the game's is held between
+  frames, scaled for dynamic resolution) back into metres and compares them with a tolerance. A
+  composite pass masks out game UI (where the alpha of a per-frame back-buffer copy marks it; the copy is rebuilt when
+  the back buffer's size or format changes) and turns premultiplied alpha into the
   straight alpha ImGui's image blend expects. The recorded list runs on the immediate context with its state restored,
   so neither the game's nor ImGui's state changes. Shaders are compiled once from HLSL with the system's
   `d3dcompiler_47`.
@@ -89,9 +99,12 @@ Every `actions/checkout` that builds the plugin needs `with: submodules: true`. 
 ## Demo
 
 `demo/KosDrawDemo` is a dev-only plugin (never released) for the in-game check. Build it, add
-`demo/KosDrawDemo/bin/Release/KosDrawDemo.dll` as a dev plugin location, enable it, and use `/kosdraw`. It draws
-every shape round your character (and a cone on your target), with switches for fills or outlines, the GPU path, the
-UI mask, the occluded alpha and depth tolerance, and one button per GPU feature to inject a fault.
+`demo/KosDrawDemo/bin/Release/KosDrawDemo.dll` as a dev plugin location, enable it, and use `/kosdraw` to toggle the
+**KosDraw demo** window. It draws circle, ring, cone, fan, arc, line and arrow, polygon, dot and text round your
+character (and a cone on your target), each with its own checkbox, plus a **Motion (gleam, ripple, pulse)** toggle off
+by default. `Pillar` is not in the demo. Other switches: outlines instead of fills, line width (1-8 px), the GPU path,
+keeping off the game's UI, alpha behind scenery, depth tolerance (0-2 m), and one button per GPU feature (`Fills`,
+`Strokes`, `Depth`, `UiMask`, `Composite`) to inject a fault, under a GPU features / last fault status line.
 
 ## Tests
 
@@ -99,7 +112,7 @@ UI mask, the occluded alpha and depth tolerance, and one button per GPU feature 
 dotnet test tests/KosDraw.Tests/KosDraw.Tests.csproj -c Release
 ```
 
-22 xUnit checks, run without the game:
+28 xUnit tests, run without the game:
 
 - **Geometry** (`src/KosShapes.cs`): arc spacing and angle convention, filled circle and ring areas, closed outlines,
   cone span, arrow head, polygon fan, pillar shape and fade, ripple/gleam/pulse at given progress, colour packing, projection against a reverse-Z camera, and near-plane clipping
@@ -107,8 +120,9 @@ dotnet test tests/KosDraw.Tests/KosDraw.Tests.csproj -c Release
 - **GPU path** (`src/KosGpu.cs`) on WARP, Windows' software Direct3D 11, with a fake depth buffer and back buffer:
   every shader compiles; a fill in front of the scene comes out in straight alpha; behind it, it is hidden or faded,
   and shows again with depth off; a 4 px line is 4 px wide; the UI mask clears shapes over UI; an injected fault in
-  depth, fills or composite switches off only that part; targets follow the viewport size; and `Dispose` returns the
-  device's reference count to where it started.
+  depth, fills or composite switches off only that part; targets follow the viewport size; the game's depth texture is
+  not held after the frame (with a control case proving the probe sees it die); and `Dispose` returns the device's
+  reference count to where it started.
 
 `src/KosOverlay.cs` (the Dalamud glue and the ImGui path) can't run outside the game; it is checked by building the demo.
 
